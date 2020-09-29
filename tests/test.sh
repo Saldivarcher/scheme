@@ -4,7 +4,7 @@ set -e
 
 function scheme() {
     expected_string=$1
-    echo "$expected_string" | ./../build/scheme
+    echo "$expected_string" | ./../build/src/scheme
 }
 
 function test_scheme() {

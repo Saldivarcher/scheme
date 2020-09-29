@@ -1,38 +1,26 @@
 cmake_minimum_required(VERSION 3.8)
-project(scheme LANGUAGES CXX)
+project(scheme)
 
-# Sources for the executable are specified at end of CMakeLists.txt
-add_executable(scheme "")
-
-### Default build type
-
-set(DEFAULT_CMAKE_BUILD_TYPE debug)
+# Needed for tests
+find_program(BASH_PROGRAM bash)
 
 ### Compile options
 
-# Enable C++17 (Required)
-set_property(TARGET scheme PROPERTY CXX_STANDARD 20)
-set_property(TARGET scheme PROPERTY CXX_STANDARD_REQUIRED ON)
-set_property(TARGET scheme PROPERTY CXX_EXTENSIONS OFF)
+# Enable C++20 (Required)
+set(CMAKE_CXX_STANDARD 20)
 
-# Common GCC/Clang(Linux) options
-target_compile_options(scheme PRIVATE
-                       -Wall
-                       -g
-                       -O0
-                       )
-
-
-### Includes
-
-target_include_directories(scheme PRIVATE src)
-
-### Install
-
-install(TARGETS scheme RUNTIME DESTINATION bin)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(STATUS "Add debug flags")
+    set(_SCHEME_DEBUG_FLAGS
+        -Wall -O0)
+    set(_SCHEME_SANITIZERS
+        -fsanitize=address -fsanitize=undefined)
+    add_compile_options(${_SCHEME_DEBUG_FLAGS} ${_SCHEME_SANITIZERS})
+    link_libraries(${_SCHEME_SANITIZERS})
+  endif()
+endif()
 
 ### Sources
 
-target_sources(scheme PRIVATE
-  src/main.cc
-)
+add_subdirectory(src)
