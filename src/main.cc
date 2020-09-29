@@ -3,20 +3,25 @@
 #include <sstream>
 #include <string>
 
-enum class object_t { FIXNUM };
+enum class object_t { FIXNUM, BOOLEAN };
 
 struct object {
   object_t type;
   union data {
+    struct boolean {
+      char value;
+    } boolean;
     struct fixnum {
       long value;
     } fixnum;
   } data;
 };
 
-using objectptr_t = std::unique_ptr<object>;
+// TODO: Figure out a way to use `unique_ptr` rather than `shared_ptr`.
+//       That might be impossible due to the state holding those objects.
+using objectptr_t = std::shared_ptr<object>;
 
-objectptr_t make_object() { return std::make_unique<object>(); }
+objectptr_t make_object() { return std::make_shared<object>(); }
 
 objectptr_t make_fixnum(long value) {
   auto obj = make_object();
@@ -24,6 +29,32 @@ objectptr_t make_fixnum(long value) {
   obj->data.fixnum.value = value;
   return obj;
 }
+
+// Rather than using global variables for the true and false objects,
+// lets keep them in a state.
+class State {
+public:
+  State() {
+    true_object = make_object();
+    true_object->type = object_t::BOOLEAN;
+    true_object->data.boolean.value = 't';
+
+    false_object = make_object();
+    false_object->type = object_t::BOOLEAN;
+    false_object->data.boolean.value = 'f';
+  }
+
+  State(const State &) = delete;
+  State &operator=(const State &) = delete;
+  ~State() = default;
+
+  objectptr_t get_true_object() { return true_object; }
+  objectptr_t get_false_object() { return false_object; }
+
+private:
+  objectptr_t true_object;
+  objectptr_t false_object;
+};
 
 void error(const char *msg, int8_t status) {
   fprintf(stderr, "%s", msg);
@@ -50,7 +81,7 @@ bool is_delimiter(char ch) {
          ch == ';';
 }
 
-objectptr_t read(std::istringstream &&input) {
+objectptr_t read(std::istringstream &&input, State &s) {
   eat_whitespace(input);
 
   char ch = input.get();
@@ -73,6 +104,16 @@ objectptr_t read(std::istringstream &&input) {
       return make_fixnum(num);
     } else
       error("Number not followed by delimiter\n", 2);
+  } else if (ch == '#') {
+    ch = input.get();
+    switch (ch) {
+    case 't':
+      return s.get_true_object();
+    case 'f':
+      return s.get_false_object();
+    default:
+      error("Unexpected character after '#'!", 4);
+    }
   } else
     error("Bad input!\n", 3);
 
@@ -87,6 +128,9 @@ void write(objectptr_t obj) {
   case object_t::FIXNUM:
     printf("%ld\n", obj->data.fixnum.value);
     break;
+  case object_t::BOOLEAN:
+    printf("#%c\n", obj->data.boolean.value);
+    break;
   default:
     error("Unknown type!\n", 1);
   }
@@ -94,10 +138,11 @@ void write(objectptr_t obj) {
 
 int main() {
   std::string input;
+  State s;
 
   printf("> ");
   while (std::cin >> input) {
-    write(eval(read(std::istringstream(input))));
+    write(eval(read(std::istringstream(input), s)));
     printf("> ");
   }
 }

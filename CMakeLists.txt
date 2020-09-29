@@ -22,15 +22,6 @@ target_compile_options(scheme PRIVATE
                        -O0
                        )
 
-#
-#if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
-#target_compile_options(9cc PRIVATE )
-#endif()
-
-#if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
-#target_compile_options(9cc PRIVATE
-#$<$<CONFIG:Debug>:-fno-limit-debug-info>)
-#endif()
 
 ### Includes
 

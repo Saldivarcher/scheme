@@ -22,5 +22,7 @@ function test_scheme() {
 
 test_scheme "-123"
 test_scheme "123"
+test_scheme "#t"
+test_scheme "#f"
 test_scheme "fail" "Bad input!"
 test_scheme "121aa" "Number not followed by delimiter"
