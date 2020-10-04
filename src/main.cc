@@ -1,9 +1,10 @@
+#include <array>
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
 
-enum class object_t { FIXNUM, BOOLEAN };
+enum class object_t { FIXNUM, BOOLEAN, CHARACTER };
 
 struct object {
   object_t type;
@@ -11,6 +12,11 @@ struct object {
     struct boolean {
       char value;
     } boolean;
+
+    struct character {
+      char value;
+    } character;
+
     struct fixnum {
       long value;
     } fixnum;
@@ -27,6 +33,13 @@ objectptr_t make_fixnum(long value) {
   auto obj = make_object();
   obj->type = object_t::FIXNUM;
   obj->data.fixnum.value = value;
+  return obj;
+}
+
+objectptr_t make_character(char value) {
+  auto obj = make_object();
+  obj->type = object_t::CHARACTER;
+  obj->data.character.value = value;
   return obj;
 }
 
@@ -77,8 +90,45 @@ void eat_whitespace(std::istringstream &input) {
 }
 
 bool is_delimiter(char ch) {
-  return isspace(ch) || ch == EOF || ch == '(' || ch == ')' || ch == '"' ||
+  return std::isspace(ch) || ch == EOF || ch == '(' || ch == ')' || ch == '"' ||
          ch == ';';
+}
+
+objectptr_t read_character(std::istringstream &input) {
+  auto eat_input_and_compare = [&](const char *expected, int size) -> bool {
+    char buffer[7];
+    input.get(buffer, size);
+    return std::string(buffer) == expected;
+  };
+
+  char ch = input.get();
+  switch (ch) {
+  case 'n':
+    // Lets look for newline
+    if (input.peek() == 'e') {
+      if (eat_input_and_compare("ewline", 7)) {
+        if (!is_delimiter(input.peek()))
+          error("Invalid character!\n", 4);
+        return make_character('\n');
+      }
+    }
+    break;
+  case 's':
+    // Lets look for space
+    if (input.peek() == 'p') {
+      if (eat_input_and_compare("pace", 5)) {
+        if (!is_delimiter(input.peek()))
+          error("Invalid character!\n", 4);
+        return make_character(' ');
+      }
+    }
+    break;
+  default:
+    break;
+  }
+  if (!is_delimiter(input.peek()))
+    error("Invalid character!\n", 4);
+  return make_character(ch);
 }
 
 objectptr_t read(std::istringstream &&input, State &s) {
@@ -111,6 +161,8 @@ objectptr_t read(std::istringstream &&input, State &s) {
       return s.get_true_object();
     case 'f':
       return s.get_false_object();
+    case '\\':
+      return read_character(input);
     default:
       error("Unexpected character after '#'!", 4);
     }
@@ -125,11 +177,27 @@ objectptr_t eval(objectptr_t obj) { return obj; }
 
 void write(objectptr_t obj) {
   switch (obj->type) {
-  case object_t::FIXNUM:
-    printf("%ld\n", obj->data.fixnum.value);
-    break;
   case object_t::BOOLEAN:
-    printf("#%c\n", obj->data.boolean.value);
+    printf("#%c", obj->data.boolean.value);
+    break;
+  case object_t::CHARACTER: {
+    printf("#\\");
+    char ch = obj->data.character.value;
+    // These are the cases where the user just inputs '#\ ' or '#\'
+    switch (ch) {
+    case '\n':
+      printf("newline");
+      break;
+    case ' ':
+      printf("space");
+      break;
+    default:
+      printf("%c", ch);
+      break;
+    }
+  } break;
+  case object_t::FIXNUM:
+    printf("%ld", obj->data.fixnum.value);
     break;
   default:
     error("Unknown type!\n", 1);
@@ -141,8 +209,9 @@ int main() {
   State s;
 
   printf("> ");
-  while (std::cin >> input) {
-    write(eval(read(std::istringstream(input), s)));
+  while (std::getline(std::cin, input)) {
+    write(eval(read(std::istringstream(input + '\n'), s)));
+    printf("\n");
     printf("> ");
   }
 }
