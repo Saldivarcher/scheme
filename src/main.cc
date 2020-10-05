@@ -3,24 +3,13 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <variant>
 
 enum class object_t { FIXNUM, BOOLEAN, CHARACTER };
 
 struct object {
   object_t type;
-  union data {
-    struct boolean {
-      char value;
-    } boolean;
-
-    struct character {
-      char value;
-    } character;
-
-    struct fixnum {
-      long value;
-    } fixnum;
-  } data;
+  std::variant<char, long> data;
 };
 
 // TODO: Figure out a way to use `unique_ptr` rather than `shared_ptr`.
@@ -29,17 +18,17 @@ using objectptr_t = std::shared_ptr<object>;
 
 objectptr_t make_object() { return std::make_shared<object>(); }
 
-objectptr_t make_fixnum(long value) {
+objectptr_t make_fixnum(long data) {
   auto obj = make_object();
   obj->type = object_t::FIXNUM;
-  obj->data.fixnum.value = value;
+  obj->data = data;
   return obj;
 }
 
-objectptr_t make_character(char value) {
+objectptr_t make_character(char data) {
   auto obj = make_object();
   obj->type = object_t::CHARACTER;
-  obj->data.character.value = value;
+  obj->data = data;
   return obj;
 }
 
@@ -50,11 +39,11 @@ public:
   State() {
     true_object = make_object();
     true_object->type = object_t::BOOLEAN;
-    true_object->data.boolean.value = 't';
+    true_object->data = 't';
 
     false_object = make_object();
     false_object->type = object_t::BOOLEAN;
-    false_object->data.boolean.value = 'f';
+    false_object->data = 'f';
   }
 
   State(const State &) = delete;
@@ -178,11 +167,11 @@ objectptr_t eval(objectptr_t obj) { return obj; }
 void write(objectptr_t obj) {
   switch (obj->type) {
   case object_t::BOOLEAN:
-    printf("#%c", obj->data.boolean.value);
+    printf("#%c", std::get<char>(obj->data));
     break;
   case object_t::CHARACTER: {
     printf("#\\");
-    char ch = obj->data.character.value;
+    char ch = std::get<char>(obj->data);
     // These are the cases where the user just inputs '#\ ' or '#\'
     switch (ch) {
     case '\n':
@@ -197,7 +186,7 @@ void write(objectptr_t obj) {
     }
   } break;
   case object_t::FIXNUM:
-    printf("%ld", obj->data.fixnum.value);
+    printf("%ld", std::get<long>(obj->data));
     break;
   default:
     error("Unknown type!\n", 1);
