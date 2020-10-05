@@ -2,6 +2,9 @@
 
 set -e
 
+RED=`tput setaf 1`
+GREEN=`tput setaf 2`
+
 function scheme() {
     expected_string=$1
     echo "$expected_string" | ./../build/src/scheme
@@ -11,11 +14,11 @@ function test_scheme() {
     expected_string=$1
     expected_error=${2:-heh}
     if scheme "$expected_string" |& grep -q "> $expected_string"; then
-        echo $expected_string passed
+        echo ${GREEN}$expected_string passed
     elif scheme "$expected_string" |& grep -q "> $expected_error"; then
-        echo $expected_string passed
+        echo ${GREEN}$expected_string passed
     else
-        echo $expected_string failed
+        echo ${RED}$expected_string failed
         exit 1
     fi
 }

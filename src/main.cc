@@ -96,7 +96,7 @@ bool is_delimiter(char ch) {
 
 objectptr_t read_character(std::istringstream &input) {
   auto eat_input_and_compare = [&](const char *expected, int size) -> bool {
-    char buffer[7];
+    char buffer[size];
     input.get(buffer, size);
     return std::string(buffer) == expected;
   };
