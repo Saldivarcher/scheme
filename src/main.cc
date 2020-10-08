@@ -5,11 +5,11 @@
 #include <string>
 #include <variant>
 
-enum class object_t { FIXNUM, BOOLEAN, CHARACTER };
+enum class object_t { FIXNUM, BOOLEAN, CHARACTER, STRING };
 
 struct object {
   object_t type;
-  std::variant<char, long> data;
+  std::variant<char, long, std::string> data;
 };
 
 // TODO: Figure out a way to use `unique_ptr` rather than `shared_ptr`.
@@ -29,6 +29,13 @@ objectptr_t make_character(char data) {
   auto obj = make_object();
   obj->type = object_t::CHARACTER;
   obj->data = data;
+  return obj;
+}
+
+objectptr_t make_string(std::string &data) {
+  auto obj = make_object();
+  obj->type = object_t::STRING;
+  obj->data = std::move(data);
   return obj;
 }
 
@@ -59,7 +66,7 @@ private:
 };
 
 void error(const char *msg, int8_t status) {
-  fprintf(stderr, "%s", msg);
+  std::fprintf(stderr, "%s", msg);
   exit(status);
 }
 
@@ -121,11 +128,26 @@ objectptr_t read_character(std::istringstream &input) {
 }
 
 objectptr_t read(std::istringstream &&input, State &s) {
+
+  auto get_or_getchar = [&](const char &ch) -> char {
+    // So when a user enters a string and starts a newline before
+    // entering a '"'. We need to get the next incoming line and insert
+    // it into the istringstream object.
+    if (ch == '\n') {
+      std::string future_input;
+      std::getline(std::cin, future_input);
+      input.clear();
+      input.str(future_input + "\n");
+      return input.get();
+    }
+    return input.get();
+  };
+
   eat_whitespace(input);
 
   char ch = input.get();
 
-  if (isdigit(ch) || (ch == '-' && isdigit(input.peek()))) {
+  if (std::isdigit(ch) || (ch == '-' && std::isdigit(input.peek()))) {
     short sign = 1;
     long num = 0;
     if (ch == '-')
@@ -133,7 +155,7 @@ objectptr_t read(std::istringstream &&input, State &s) {
     else
       input.unget();
 
-    while (isdigit(ch = input.get()))
+    while (std::isdigit(ch = input.get()))
       num = (num * 10) + (ch - '0');
 
     num *= sign;
@@ -155,6 +177,27 @@ objectptr_t read(std::istringstream &&input, State &s) {
     default:
       error("Unexpected character after '#'!", 4);
     }
+  } else if (ch == '"') {
+    std::string s;
+    while ((ch = get_or_getchar(ch)) != '"') {
+      if (ch == '\\') {
+        if (input.peek() == '"') {
+          // Eat '\' char
+          s += ch;
+
+          ch = input.get();
+
+          // Eat '"' char
+          s += ch;
+          continue;
+        }
+      }
+      if (ch == EOF)
+        error("There shouldn't be a null-terminated character here!", 5);
+      s += ch;
+    }
+
+    return make_string(s);
   } else
     error("Bad input!\n", 3);
 
@@ -167,27 +210,43 @@ objectptr_t eval(objectptr_t obj) { return obj; }
 void write(objectptr_t obj) {
   switch (obj->type) {
   case object_t::BOOLEAN:
-    printf("#%c", std::get<char>(obj->data));
+    std::printf("#%c", std::get<char>(obj->data));
     break;
   case object_t::CHARACTER: {
-    printf("#\\");
+    std::printf("#\\");
     char ch = std::get<char>(obj->data);
     // These are the cases where the user just inputs '#\ ' or '#\'
     switch (ch) {
     case '\n':
-      printf("newline");
+      std::printf("newline");
       break;
     case ' ':
-      printf("space");
+      std::printf("space");
       break;
     default:
-      printf("%c", ch);
+      std::printf("%c", ch);
       break;
     }
   } break;
   case object_t::FIXNUM:
-    printf("%ld", std::get<long>(obj->data));
+    std::printf("%ld", std::get<long>(obj->data));
     break;
+  case object_t::STRING: {
+    std::string data = std::get<std::string>(obj->data);
+    std::printf("\"");
+    for (const auto &ch : data) {
+      switch (ch) {
+      case '\n':
+        std::printf("\\n");
+        break;
+      default:
+        std::printf("%c", ch);
+        break;
+      }
+    }
+    std::printf("\"");
+    break;
+  }
   default:
     error("Unknown type!\n", 1);
   }
@@ -197,10 +256,10 @@ int main() {
   std::string input;
   State s;
 
-  printf("> ");
+  std::printf("> ");
   while (std::getline(std::cin, input)) {
     write(eval(read(std::istringstream(input + '\n'), s)));
-    printf("\n");
-    printf("> ");
+    std::printf("\n");
+    std::printf("> ");
   }
 }

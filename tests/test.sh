@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -x
 
 RED=`tput setaf 1`
 GREEN=`tput setaf 2`
@@ -30,6 +30,7 @@ test_scheme "#f"
 test_scheme "#\\space" "#\\\\space"
 test_scheme "#\\newline" "#\\\\newline"
 test_scheme "#\\a" "#\\\\a"
+test_scheme '"hello, world"'
 test_scheme "fail" "Bad input!"
 test_scheme "121aa" "Number not followed by delimiter"
 test_scheme "#\\asdfsa" "Invalid character!"
