@@ -18,23 +18,9 @@ using objectptr_t = std::shared_ptr<object>;
 
 objectptr_t make_object() { return std::make_shared<object>(); }
 
-objectptr_t make_fixnum(long data) {
+objectptr_t make_object(object_t type, auto &&data) {
   auto obj = make_object();
-  obj->type = object_t::FIXNUM;
-  obj->data = data;
-  return obj;
-}
-
-objectptr_t make_character(char data) {
-  auto obj = make_object();
-  obj->type = object_t::CHARACTER;
-  obj->data = data;
-  return obj;
-}
-
-objectptr_t make_string(std::string &data) {
-  auto obj = make_object();
-  obj->type = object_t::STRING;
+  obj->type = type;
   obj->data = std::move(data);
   return obj;
 }
@@ -44,13 +30,8 @@ objectptr_t make_string(std::string &data) {
 class State {
 public:
   State() {
-    true_object = make_object();
-    true_object->type = object_t::BOOLEAN;
-    true_object->data = 't';
-
-    false_object = make_object();
-    false_object->type = object_t::BOOLEAN;
-    false_object->data = 'f';
+    true_object = make_object(object_t::BOOLEAN, 't');
+    false_object = make_object(object_t::BOOLEAN, 'f');
   }
 
   State(const State &) = delete;
@@ -105,7 +86,7 @@ objectptr_t read_character(std::istringstream &input) {
       if (eat_input_and_compare("ewline", 7)) {
         if (!is_delimiter(input.peek()))
           error("Invalid character!\n", 4);
-        return make_character('\n');
+        return make_object(object_t::CHARACTER, '\n');
       }
     }
     break;
@@ -115,7 +96,7 @@ objectptr_t read_character(std::istringstream &input) {
       if (eat_input_and_compare("pace", 5)) {
         if (!is_delimiter(input.peek()))
           error("Invalid character!\n", 4);
-        return make_character(' ');
+        return make_object(object_t::CHARACTER, ' ');
       }
     }
     break;
@@ -124,7 +105,7 @@ objectptr_t read_character(std::istringstream &input) {
   }
   if (!is_delimiter(input.peek()))
     error("Invalid character!\n", 4);
-  return make_character(ch);
+  return make_object(object_t::CHARACTER, ch);
 }
 
 objectptr_t read(std::istringstream &&input, State &s) {
@@ -162,7 +143,7 @@ objectptr_t read(std::istringstream &&input, State &s) {
 
     if (is_delimiter(ch)) {
       input.unget();
-      return make_fixnum(num);
+      return make_object(object_t::FIXNUM, num);
     } else
       error("Number not followed by delimiter\n", 2);
   } else if (ch == '#') {
@@ -197,7 +178,7 @@ objectptr_t read(std::istringstream &&input, State &s) {
       s += ch;
     }
 
-    return make_string(s);
+    return make_object(object_t::STRING, s);
   } else
     error("Bad input!\n", 3);
 
