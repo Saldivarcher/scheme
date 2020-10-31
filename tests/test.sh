@@ -31,6 +31,7 @@ test_scheme "#\\space" "#\\\\space"
 test_scheme "#\\newline" "#\\\\newline"
 test_scheme "#\\a" "#\\\\a"
 test_scheme '"hello, world"'
+test_scheme "()"
 test_scheme "fail" "Bad input!"
 test_scheme "121aa" "Number not followed by delimiter"
 test_scheme "#\\asdfsa" "Invalid character!"

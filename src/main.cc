@@ -5,7 +5,7 @@
 #include <string>
 #include <variant>
 
-enum class object_t { FIXNUM, BOOLEAN, CHARACTER, STRING };
+enum class object_t { FIXNUM, BOOLEAN, CHARACTER, STRING, EMPTY_LIST };
 
 struct object {
   object_t type;
@@ -32,6 +32,9 @@ public:
   State() {
     true_object = make_object(object_t::BOOLEAN, 't');
     false_object = make_object(object_t::BOOLEAN, 'f');
+
+    empty_list_object = make_object();
+    empty_list_object->type = object_t::EMPTY_LIST;
   }
 
   State(const State &) = delete;
@@ -40,10 +43,12 @@ public:
 
   objectptr_t get_true_object() { return true_object; }
   objectptr_t get_false_object() { return false_object; }
+  objectptr_t get_empty_list_object() { return empty_list_object; }
 
 private:
   objectptr_t true_object;
   objectptr_t false_object;
+  objectptr_t empty_list_object;
 };
 
 void error(const char *msg, int8_t status) {
@@ -179,6 +184,13 @@ objectptr_t read(std::istringstream &&input, State &s) {
     }
 
     return make_object(object_t::STRING, s);
+  } else if (ch == '(') {
+    eat_whitespace(input);
+    ch = input.get();
+    if (ch == ')') {
+
+      return s.get_empty_list_object();
+    }
   } else
     error("Bad input!\n", 3);
 
@@ -228,6 +240,9 @@ void write(objectptr_t obj) {
     std::printf("\"");
     break;
   }
+  case object_t::EMPTY_LIST:
+    std::printf("()");
+    break;
   default:
     error("Unknown type!\n", 1);
   }
