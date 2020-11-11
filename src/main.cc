@@ -5,11 +5,14 @@
 #include <string>
 #include <variant>
 
-enum class object_t { FIXNUM, BOOLEAN, CHARACTER, STRING, EMPTY_LIST };
+enum class object_t { FIXNUM, BOOLEAN, CHARACTER, STRING, EMPTY_LIST, PAIRS };
 
 struct object {
+  using object_pair =
+      std::pair<std::shared_ptr<object>, std::shared_ptr<object>>;
+
   object_t type;
-  std::variant<char, long, std::string> data;
+  std::variant<char, long, std::string, object_pair> data;
 };
 
 // TODO: Figure out a way to use `unique_ptr` rather than `shared_ptr`.
@@ -113,7 +116,9 @@ objectptr_t read_character(std::istringstream &input) {
   return make_object(object_t::CHARACTER, ch);
 }
 
-objectptr_t read(std::istringstream &&input, State &s) {
+objectptr_t read_pair(std::istringstream &in, State &s);
+
+objectptr_t inner_read(std::istringstream &input, State &s) {
 
   auto get_or_getchar = [&](const char &ch) -> char {
     // So when a user enters a string and starts a newline before
@@ -185,12 +190,7 @@ objectptr_t read(std::istringstream &&input, State &s) {
 
     return make_object(object_t::STRING, s);
   } else if (ch == '(') {
-    eat_whitespace(input);
-    ch = input.get();
-    if (ch == ')') {
-
-      return s.get_empty_list_object();
-    }
+    return read_pair(input, s);
   } else
     error("Bad input!\n", 3);
 
@@ -198,7 +198,61 @@ objectptr_t read(std::istringstream &&input, State &s) {
   return nullptr;
 }
 
+objectptr_t read_pair(std::istringstream &input, State &s) {
+  eat_whitespace(input);
+
+  char ch = input.get();
+
+  // Handle 'empty' list object.
+  if (ch == ')')
+    return s.get_empty_list_object();
+
+  input.unget();
+
+  auto car_obj = inner_read(input, s);
+
+  eat_whitespace(input);
+  if (ch = input.get(); ch == '.') {
+    if (!is_delimiter(input.peek()))
+      error("dot not followed by delimiter!!\n", 1);
+
+    auto cdr_obj = inner_read(input, s);
+    eat_whitespace(input);
+
+    if (ch = input.get(); ch != ')')
+      error("No matching paren?!\n", 10);
+    return make_object(object_t::PAIRS, object::object_pair(car_obj, cdr_obj));
+  } else {
+    input.unget();
+    auto cdr_obj = read_pair(input, s);
+    return make_object(object_t::PAIRS, object::object_pair(car_obj, cdr_obj));
+  }
+}
+
+objectptr_t read(std::istringstream &&input, State &s) {
+  return inner_read(input, s);
+}
+
 objectptr_t eval(objectptr_t obj) { return obj; }
+
+void write(objectptr_t obj);
+
+void write_pair(objectptr_t obj) {
+  auto cons = std::get<object::object_pair>(obj->data);
+  auto car = cons.first;
+  auto cdr = cons.second;
+  write(car);
+
+  if (cdr->type == object_t::PAIRS) {
+    std::printf(" ");
+    write_pair(cdr);
+  } else if (cdr->type == object_t::EMPTY_LIST) {
+    return;
+  } else {
+    std::printf(" . ");
+    write(cdr);
+  }
+}
 
 void write(objectptr_t obj) {
   switch (obj->type) {
@@ -242,6 +296,11 @@ void write(objectptr_t obj) {
   }
   case object_t::EMPTY_LIST:
     std::printf("()");
+    break;
+  case object_t::PAIRS:
+    std::printf("(");
+    write_pair(obj);
+    std::printf(")");
     break;
   default:
     error("Unknown type!\n", 1);
