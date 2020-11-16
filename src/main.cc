@@ -61,11 +61,9 @@ private:
 
 class Reader {
 public:
-  Reader() = default;
+  Reader(State &s) : s(s) {}
 
-  objectptr_t read(std::istringstream &&input, State &s) {
-    return inner_read(input, s);
-  }
+  objectptr_t read(std::istringstream &&input) { return inner_read(input); }
 
 private:
   inline void eat_whitespace(std::istringstream &input) {
@@ -125,7 +123,7 @@ private:
     return object::make_object(object_t::CHARACTER, ch);
   }
 
-  objectptr_t read_pair(std::istringstream &input, State &s) {
+  objectptr_t read_pair(std::istringstream &input) {
     eat_whitespace(input);
 
     char ch = input.get();
@@ -136,14 +134,14 @@ private:
 
     input.unget();
 
-    auto car_obj = inner_read(input, s);
+    auto car_obj = inner_read(input);
 
     eat_whitespace(input);
     if (ch = input.get(); ch == '.') {
       if (!is_delimiter(input.peek()))
         error("dot not followed by delimiter!!\n", 1);
 
-      auto cdr_obj = inner_read(input, s);
+      auto cdr_obj = inner_read(input);
       eat_whitespace(input);
 
       if (ch = input.get(); ch != ')')
@@ -152,13 +150,13 @@ private:
                                  object::object_pair(car_obj, cdr_obj));
     } else {
       input.unget();
-      auto cdr_obj = read_pair(input, s);
+      auto cdr_obj = read_pair(input);
       return object::make_object(object_t::PAIR,
                                  object::object_pair(car_obj, cdr_obj));
     }
   }
 
-  objectptr_t inner_read(std::istringstream &input, State &s) {
+  objectptr_t inner_read(std::istringstream &input) {
     auto get_or_getchar = [&](const char &ch) -> char {
       // So when a user enters a string and starts a newline before
       // entering a '"'. We need to get the next incoming line and insert
@@ -178,6 +176,7 @@ private:
     char ch = input.get();
 
     if (std::isdigit(ch) || (ch == '-' && std::isdigit(input.peek()))) {
+      // Read a fixnum
       short sign = 1;
       long num = 0;
       if (ch == '-')
@@ -196,6 +195,7 @@ private:
       } else
         error("Number not followed by delimiter\n", 2);
     } else if (ch == '#') {
+      // Read a bool or char
       ch = input.get();
       switch (ch) {
       case 't':
@@ -208,34 +208,38 @@ private:
         error("Unexpected character after '#'!", 4);
       }
     } else if (ch == '"') {
-      std::string s;
+      // Read a string
+      std::string temp_str;
       while ((ch = get_or_getchar(ch)) != '"') {
         if (ch == '\\') {
           if (input.peek() == '"') {
             // Eat '\' char
-            s += ch;
+            temp_str += ch;
 
             ch = input.get();
 
             // Eat '"' char
-            s += ch;
+            temp_str += ch;
             continue;
           }
         }
         if (ch == EOF)
           error("There shouldn't be a null-terminated character here!", 5);
-        s += ch;
+        temp_str += ch;
       }
 
-      return object::make_object(object_t::STRING, s);
+      return object::make_object(object_t::STRING, temp_str);
     } else if (ch == '(') {
-      return read_pair(input, s);
+      // Read a pair
+      return read_pair(input);
     } else
       error("Bad input!\n", 3);
 
     error("Illegal state\n", 4);
     return nullptr;
   }
+
+  State &s;
 };
 
 class Writer {
@@ -316,22 +320,22 @@ private:
 
 class Driver {
 public:
-  Driver() : r(), w(), s() {}
+  Driver() : s(), w(), r(s) {}
 
   void drive() {
     std::string input;
     std::printf("> ");
     while (std::getline(std::cin, input)) {
-      w.write(eval(r.read(std::istringstream(input + '\n'), s)));
+      w.write(eval(r.read(std::istringstream(input + '\n'))));
       std::printf("\n");
       std::printf("> ");
     }
   }
 
 private:
-  Reader r;
-  Writer w;
   State s;
+  Writer w;
+  Reader r;
 
   objectptr_t eval(objectptr_t obj) { return obj; }
 };
